@@ -265,23 +265,56 @@ func (s *meetingServer) EndMeeting(ctx context.Context, req *pbmeeting.EndMeetin
 }
 
 func (s *meetingServer) GetMeetings(ctx context.Context, req *pbmeeting.GetMeetingsReq) (*pbmeeting.GetMeetingsResp, error) {
-	s.refreshMeetingStatus(ctx)
 	resp := &pbmeeting.GetMeetingsResp{}
-	meetings, err := s.meetingStorageHandler.FindByStatus(ctx, req.Status, req.UserID)
-	if err != nil {
-		return resp, err
+	if req.UserID == "" {
+		return resp, errs.ErrArgs.WrapMsg("userID is required")
 	}
+	s.refreshMeetingStatus(ctx)
 
-	// Create response
-	var meetingDetails []*pbmeeting.MeetingInfoSetting
-	for _, meeting := range meetings {
-		detailSetting, err := s.getMeetingDetailSetting(ctx, meeting)
-		if err != nil {
-			continue
+	// A meeting's creator is immutable. Only the ongoing catalog follows the
+	// current host; booked and completed meetings remain with their creator.
+	var creatorStatuses []string
+	includeInProgress := false
+	for _, status := range req.Status {
+		if status == constant.InProgress {
+			includeInProgress = true
+		} else {
+			creatorStatuses = append(creatorStatuses, status)
 		}
-		meetingDetails = append(meetingDetails, detailSetting)
 	}
-	resp.MeetingDetails = meetingDetails
+	var meetingDetails []*pbmeeting.MeetingInfoSetting
+	if includeInProgress {
+		ongoing, err := s.getHostedInProgressMeetings(ctx, req.UserID)
+		if err != nil {
+			return resp, err
+		}
+		meetingDetails = append(meetingDetails, ongoing...)
+	}
+	if len(creatorStatuses) > 0 {
+		meetings, err := s.meetingStorageHandler.FindByStatus(ctx, creatorStatuses, req.UserID)
+		if err != nil {
+			return resp, err
+		}
+		for _, meeting := range meetings {
+			detailSetting, err := s.getMeetingDetailSetting(ctx, meeting)
+			if err != nil {
+				continue
+			}
+			meetingDetails = append(meetingDetails, detailSetting)
+		}
+	}
+	// A meeting can end between the ongoing snapshot and the creator query.
+	// Keep the later record without returning duplicate identities.
+	indices := make(map[string]int)
+	for _, detail := range meetingDetails {
+		id := detail.Info.SystemGenerated.MeetingID
+		if index, exists := indices[id]; exists {
+			resp.MeetingDetails[index] = detail
+		} else {
+			indices[id] = len(resp.MeetingDetails)
+			resp.MeetingDetails = append(resp.MeetingDetails, detail)
+		}
+	}
 	return resp, nil
 }
 

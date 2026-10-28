@@ -18,6 +18,7 @@ type Meeting interface {
 	Update(ctx context.Context, meetingID string, updateData map[string]any) (err error)
 	Delete(ctx context.Context, meetingID string) (err error)
 	FindByStatus(ctx context.Context, status []string, userID string) ([]*model.MeetingInfo, error)
+	TakeCatalog(ctx context.Context, meetingID string) (*model.MeetingInfo, error)
 	GenerateMeetingID(ctx context.Context) (string, error)
 }
 
@@ -76,4 +77,10 @@ func (u *MeetingStorageManager) FindByStatus(ctx context.Context, status []strin
 
 func (u *MeetingStorageManager) GenerateMeetingID(ctx context.Context) (string, error) {
 	return u.cache.GenerateMeetingID(ctx)
+}
+
+// TakeCatalog preserves the catalog's direct database reads. Session caches may
+// contain a previous status and must not decide whether a hosted room is listed.
+func (u *MeetingStorageManager) TakeCatalog(ctx context.Context, meetingID string) (*model.MeetingInfo, error) {
+	return u.db.Take(ctx, meetingID)
 }

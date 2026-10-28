@@ -181,6 +181,23 @@ func (s *meetingServer) generateMeetingMetaData(ctx context.Context, info *model
 }
 
 func (s *meetingServer) getMeetingDetailSetting(ctx context.Context, info *model.MeetingInfo) (*pbmeeting.MeetingInfoSetting, error) {
+	metaData, err := s.meetingRtc.GetRoomData(ctx, info.MeetingID)
+	if info.Status == constant.InProgress {
+		if err != nil {
+			return nil, errs.WrapMsg(err, "current meeting ownership is unavailable")
+		}
+		if err := validateCatalogMetadata(info.MeetingID, metaData); err != nil {
+			return nil, err
+		}
+	} else if err != nil || validateCatalogMetadata(info.MeetingID, metaData) != nil {
+		metaData = nil
+	}
+	return s.getMeetingDetailSettingWithMetadata(ctx, info, metaData)
+}
+
+// The ongoing catalog passes its already-validated ListRooms snapshot here.
+// Reading the room again could mix two host revisions or silently use creator.
+func (s *meetingServer) getMeetingDetailSettingWithMetadata(ctx context.Context, info *model.MeetingInfo, metaData *pbmeeting.MeetingMetadata) (*pbmeeting.MeetingInfoSetting, error) {
 	// Fill in response data
 	userInfo, err := s.userRpc.GetUserInfo(ctx, info.CreatorUserID)
 	if err != nil {
@@ -231,9 +248,8 @@ func (s *meetingServer) getMeetingDetailSetting(ctx context.Context, info *model
 	meetingInfoSetting.Info.CreatorDefinedMeeting.MeetingDuration = info.MeetingDuration
 	meetingInfoSetting.Info.CreatorDefinedMeeting.HostUserID = info.CreatorUserID
 
-	// first priority
-	metaData, err := s.meetingRtc.GetRoomData(ctx, info.MeetingID)
-	if err == nil {
+	// Live metadata is authoritative when available.
+	if metaData != nil {
 		//meetingInfoSetting.Setting = metaData.Detail.Setting
 		//meetingInfoSetting.Info.SystemGenerated.CreatorNickname = metaData.Detail.Info.SystemGenerated.CreatorNickname
 		//meetingInfoSetting.Info.CreatorDefinedMeeting.MeetingDuration = metaData.Detail.Info.CreatorDefinedMeeting.MeetingDuration
