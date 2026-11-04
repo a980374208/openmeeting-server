@@ -2,12 +2,14 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/cache"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/database"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/model"
 	"github.com/openimsdk/tools/db/tx"
 	"github.com/openimsdk/tools/errs"
 	"github.com/openimsdk/tools/utils/datautil"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Meeting interface {
@@ -82,5 +84,12 @@ func (u *MeetingStorageManager) GenerateMeetingID(ctx context.Context) (string, 
 // TakeCatalog preserves the catalog's direct database reads. Session caches may
 // contain a previous status and must not decide whether a hosted room is listed.
 func (u *MeetingStorageManager) TakeCatalog(ctx context.Context, meetingID string) (*model.MeetingInfo, error) {
-	return u.db.Take(ctx, meetingID)
+	meeting, err := u.db.Take(ctx, meetingID)
+	// Direct Mongo reads retain ErrNoDocuments below the RPC middleware. Match
+	// the cache's not-found contract so foreign or concurrently deleted rooms
+	// do not turn a shared LiveKit snapshot into a failed business catalog.
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, errs.ErrRecordNotFound.WrapMsg("meeting catalog record not found")
+	}
+	return meeting, err
 }
