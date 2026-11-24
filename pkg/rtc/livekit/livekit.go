@@ -207,7 +207,7 @@ func (x *LiveKit) CloseRoom(ctx context.Context, roomID string) error {
 	_, err := x.roomClient.DeleteRoom(ctx, &livekit.DeleteRoomRequest{
 		Room: roomID,
 	})
-	if err != nil {
+	if err != nil && !x.IsNotFound(err) {
 		return errs.WrapMsg(err, "delete livekit room failed, meetingID", roomID)
 	}
 	return nil

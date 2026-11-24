@@ -2,6 +2,8 @@ package meeting
 
 import (
 	"context"
+	"sync"
+	"github.com/openimsdk/openmeeting-server/pkg/agentrpc"
 	"github.com/openimsdk/openmeeting-server/pkg/common/config"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/cache/redis"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/controller"
@@ -14,6 +16,7 @@ import (
 	"github.com/openimsdk/tools/db/mongoutil"
 	"github.com/openimsdk/tools/db/redisutil"
 	registry "github.com/openimsdk/tools/discovery"
+	goredis "github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
@@ -23,6 +26,10 @@ type meetingServer struct {
 	meetingRtc            rtc.MeetingRtc
 	config                *Config
 	userRpc               *rpcclient.User
+	rdb                   goredis.UniversalClient
+	agentLockMu           sync.Mutex
+	agentRoomLocks        map[string]*sync.Mutex
+	agentPendingClaims    map[string]pendingAgentClaim
 }
 
 type Config struct {
@@ -63,7 +70,11 @@ func Start(ctx context.Context, config *Config, client registry.SvcDiscoveryRegi
 		config:                config,
 		meetingRtc:            meetingRtc,
 		userRpc:               userRpc,
+		rdb:                   rdb,
+		agentRoomLocks:        make(map[string]*sync.Mutex),
+		agentPendingClaims:    make(map[string]pendingAgentClaim),
 	}
 	pbmeeting.RegisterMeetingServiceServer(server, u)
+	agentrpc.RegisterAgentTokenServiceServer(server, u)
 	return nil
 }
