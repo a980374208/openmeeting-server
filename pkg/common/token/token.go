@@ -3,6 +3,7 @@ package token
 import (
 	"errors"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/openimsdk/tools/errs"
 	"time"
 )
@@ -35,6 +36,7 @@ func (t *Token) buildClaims(userID string) claims {
 	return claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.NewString(),                          // Unique jti so rapid logins never share a token
 			ExpiresAt: jwt.NewNumericDate(now.Add(t.Expires)),    // Expiration time
 			IssuedAt:  jwt.NewNumericDate(now),                   // Issuing time
 			NotBefore: jwt.NewNumericDate(now.Add(-time.Minute)), // Begin Effective time

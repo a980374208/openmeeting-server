@@ -3,6 +3,7 @@ package rpcclient
 import (
 	"context"
 	"github.com/openimsdk/openmeeting-server/pkg/agentrpc"
+	"github.com/openimsdk/openmeeting-server/pkg/callrpc"
 	"github.com/openimsdk/protocol/openmeeting/meeting"
 	"github.com/openimsdk/tools/discovery"
 	"github.com/openimsdk/tools/system/program"
@@ -13,6 +14,7 @@ type Meeting struct {
 	conn        grpc.ClientConnInterface
 	Client      meeting.MeetingServiceClient
 	AgentClient agentrpc.AgentTokenServiceClient
+	CallClient  callrpc.CallSignalingServiceClient
 	Discovery   discovery.SvcDiscoveryRegistry
 }
 
@@ -24,10 +26,12 @@ func NewMeeting(discovery discovery.SvcDiscoveryRegistry, rpcRegisterName string
 	}
 	client := meeting.NewMeetingServiceClient(conn)
 	agentClient := agentrpc.NewAgentTokenServiceClient(conn)
+	callClient := callrpc.NewCallSignalingServiceClient(conn)
 	return &Meeting{
 		Discovery:   discovery,
 		Client:      client,
 		AgentClient: agentClient,
+		CallClient:  callClient,
 		conn:        conn,
 	}
 }

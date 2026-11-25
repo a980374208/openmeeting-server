@@ -1,5 +1,9 @@
 expire: 1
 secret: "sdASD@#(231"
+# Organization founders (accounts or userIDs) designated ONLY on the server host.
+# Can also be supplemented via environment variable OPENMEETING_ORG_FOUNDERS (comma-separated).
+# Example: orgFounders: [ "10000" ]
+orgFounders: []
 api:
   # Listening IP; 0.0.0.0 means both internal and external IPs are listened to, default is recommended
   listenIP: 0.0.0.0

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"github.com/openimsdk/openmeeting-server/pkg/contactrpc"
 	"github.com/openimsdk/protocol/openmeeting/user"
 	"github.com/openimsdk/tools/discovery"
 	"github.com/openimsdk/tools/system/program"
@@ -13,6 +14,14 @@ func NewMeetingUserClient(discov discovery.SvcDiscoveryRegistry, rpcRegisterName
 		program.ExitWithError(err)
 	}
 	return user.NewUserClient(conn)
+}
+
+func NewContactDirectoryClient(discov discovery.SvcDiscoveryRegistry, rpcRegisterName string) contactrpc.ContactDirectoryServiceClient {
+	conn, err := discov.GetConn(context.Background(), rpcRegisterName)
+	if err != nil {
+		program.ExitWithError(err)
+	}
+	return contactrpc.NewContactDirectoryServiceClient(conn)
 }
 
 func NewMeeting(discov discovery.SvcDiscoveryRegistry, rpcRegisterName string) User {

@@ -25,9 +25,12 @@ import (
 	"github.com/openimsdk/openmeeting-server/pkg/common/servererrs"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/cache/redis"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/controller"
+	"github.com/openimsdk/openmeeting-server/pkg/common/storage/database"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/database/mgo"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/model"
 	"github.com/openimsdk/openmeeting-server/pkg/common/token"
+	"github.com/openimsdk/openmeeting-server/pkg/contactrpc"
+	"github.com/openimsdk/openmeeting-server/pkg/events"
 	"github.com/openimsdk/openmeeting-server/pkg/rpcclient"
 	pbmeeting "github.com/openimsdk/protocol/openmeeting/meeting"
 	pbuser "github.com/openimsdk/protocol/openmeeting/user"
@@ -42,6 +45,8 @@ import (
 
 type userServer struct {
 	userStorageHandler controller.User
+	contactDB          database.Contact
+	eventHub           *events.Hub
 	RegisterCenter     registry.SvcDiscoveryRegistry
 	config             *Config
 	tokenVerify        *token.Token
@@ -70,6 +75,10 @@ func Start(ctx context.Context, config *Config, client registry.SvcDiscoveryRegi
 	if err != nil {
 		return err
 	}
+	contactDB, err := mgo.NewContactMongo(mgoCli.GetDB())
+	if err != nil {
+		return err
+	}
 	userCache := redis.NewUser(rdb, userDB, redis.GetDefaultOpt())
 	database := controller.NewUser(userDB, userCache, mgoCli.GetTx())
 	tokenVerify := token.New(config.Rpc.Token.Expires, config.Rpc.Token.Secret)
@@ -78,12 +87,15 @@ func Start(ctx context.Context, config *Config, client registry.SvcDiscoveryRegi
 
 	u := &userServer{
 		userStorageHandler: database,
+		contactDB:          contactDB,
+		eventHub:           events.NewHub(rdb),
 		RegisterCenter:     client,
 		config:             config,
 		tokenVerify:        tokenVerify,
 		meetingRpc:         meetingRpc,
 	}
 	pbuser.RegisterUserServer(server, u)
+	contactrpc.RegisterContactDirectoryServiceServer(server, u)
 	return nil
 }
 
@@ -150,6 +162,10 @@ func (s *userServer) UserLogin(ctx context.Context, req *pbuser.UserLoginReq) (*
 	if err := s.userStorageHandler.StoreToken(ctx, user.UserID, userToken); err != nil {
 		return resp, err
 	}
+	// Immediately notify any previous lobby WebSocket connection of single-device kick.
+	if s.eventHub != nil {
+		_ = s.eventHub.PublishSessionKicked(ctx, user.UserID, "duplicated_login", userToken)
+	}
 	resp.UserID = user.UserID
 	resp.Token = userToken
 	resp.Nickname = user.Nickname
@@ -213,6 +229,9 @@ func (s *userServer) UserLogout(ctx context.Context, req *pbuser.LogoutReq) (*pb
 
 	if err := s.userStorageHandler.ClearUserToken(ctx, req.UserID); err != nil {
 		return resp, errs.WrapMsg(err, "clear token failed")
+	}
+	if s.eventHub != nil {
+		_ = s.eventHub.PublishSessionKicked(ctx, req.UserID, "logout", "")
 	}
 
 	// clean previous meeting

@@ -35,4 +35,15 @@ var (
 	ErrMeetingAlreadyCompleted   = errs.NewCodeError(MeetingCompleteError, "MeetingCompleteError")
 	ErrMeetingAgentAlreadyOnline = errs.NewCodeError(MeetingAgentAlreadyOnlineError, "MeetingAgentAlreadyOnlineError")
 	ErrMeetingAgentClaimBusy     = errs.NewCodeError(MeetingAgentClaimBusyError, "MeetingAgentClaimBusyError")
+
+	ErrContactBlocked               = errs.NewCodeError(ContactBlockedError, "ContactBlockedError")
+	ErrContactRequestNotFound       = errs.NewCodeError(ContactRequestNotFoundError, "ContactRequestNotFoundError")
+	ErrContactRequestAlreadyHandled = errs.NewCodeError(ContactRequestAlreadyHandledError, "ContactRequestAlreadyHandledError")
+	ErrContactNotFound              = errs.NewCodeError(ContactNotFoundError, "ContactNotFoundError")
+	ErrDepartmentNotFound           = errs.NewCodeError(DepartmentNotFoundError, "DepartmentNotFoundError")
+
+	ErrCallBusy             = errs.NewCodeError(CallBusyError, "CallBusyError")
+	ErrCallNotFound         = errs.NewCodeError(CallNotFoundError, "CallNotFoundError")
+	ErrCallAlreadyEnded     = errs.NewCodeError(CallAlreadyEndedError, "CallAlreadyEndedError")
+	ErrCallPermissionDenied = errs.NewCodeError(CallPermissionDeniedError, "CallPermissionDeniedError")
 )

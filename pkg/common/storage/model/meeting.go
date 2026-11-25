@@ -16,6 +16,7 @@ type MeetingInfo struct {
 	RepeatType      string  `bson:"repeat_type"`        // none, daily, weekly, monthly, custom
 	UintType        string  `bson:"uint_type"`          // only used when repeat_type is custom
 	Interval        int32   `bson:"interval"`           // only used when repeat_type is custom
-	RepeatDayOfWeek []int32 `bson:"repeat_day_of_week"` // only used when repeat_type is custom
-	Setting         string  `bson:"setting"`
+	RepeatDayOfWeek []int32  `bson:"repeat_day_of_week"` // only used when repeat_type is custom
+	Setting         string   `bson:"setting"`
+	InviteeUserIDs  []string `bson:"invitee_user_ids,omitempty"`
 }

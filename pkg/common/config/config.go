@@ -50,9 +50,10 @@ type Share struct {
 }
 
 type API struct {
-	Secret string `mapstructure:"secret"`
-	Expire int    `mapstructure:"expire"`
-	Api    struct {
+	Secret      string   `mapstructure:"secret"`
+	Expire      int      `mapstructure:"expire"`
+	OrgFounders []string `mapstructure:"orgFounders"`
+	Api         struct {
 		ListenIP string `mapstructure:"listenIP"`
 		Ports    []int  `mapstructure:"ports"`
 	} `mapstructure:"api"`

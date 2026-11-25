@@ -44,6 +44,13 @@ type User interface {
 
 	// GenerateUserID generate a unique user id
 	GenerateUserID(ctx context.Context) (string, error)
+
+	TakeByExactIdentifier(ctx context.Context, identifier string) (*model.User, error)
+	FindByUserIDs(ctx context.Context, userIDs []string) ([]*model.User, error)
+	UpdateProfile(ctx context.Context, userID string, account string, update map[string]any) error
+	UpsertByAccount(ctx context.Context, user *model.User) error
+	SearchByPrefix(ctx context.Context, keyword string, deptID string, restrictUserIDs []string, offset, limit int64) ([]*model.User, int64, error)
+	ListAll(ctx context.Context, keyword string, offset, limit int64) ([]*model.User, int64, error)
 }
 
 type UserStorageManager struct {
@@ -109,4 +116,46 @@ func (u *UserStorageManager) ClearUserToken(ctx context.Context, userID string) 
 
 func (u *UserStorageManager) GenerateUserID(ctx context.Context) (string, error) {
 	return u.cache.GenerateUserID(ctx)
+}
+
+func (u *UserStorageManager) TakeByExactIdentifier(ctx context.Context, identifier string) (*model.User, error) {
+	return u.db.TakeByExactIdentifier(ctx, identifier)
+}
+
+func (u *UserStorageManager) FindByUserIDs(ctx context.Context, userIDs []string) ([]*model.User, error) {
+	return u.db.FindByUserIDs(ctx, userIDs)
+}
+
+func (u *UserStorageManager) UpdateProfile(ctx context.Context, userID string, account string, update map[string]any) error {
+	return u.tx.Transaction(ctx, func(ctx context.Context) error {
+		if err := u.db.UpdateProfile(ctx, userID, update); err != nil {
+			return err
+		}
+		keys := []string{userID}
+		if account != "" {
+			keys = append(keys, account)
+		}
+		return u.cache.DelUsersInfo(keys...).ExecDel(ctx)
+	})
+}
+
+func (u *UserStorageManager) UpsertByAccount(ctx context.Context, user *model.User) error {
+	return u.tx.Transaction(ctx, func(ctx context.Context) error {
+		if err := u.db.UpsertByAccount(ctx, user); err != nil {
+			return err
+		}
+		keys := []string{user.Account}
+		if user.UserID != "" {
+			keys = append(keys, user.UserID)
+		}
+		return u.cache.DelUsersInfo(keys...).ExecDel(ctx)
+	})
+}
+
+func (u *UserStorageManager) SearchByPrefix(ctx context.Context, keyword string, deptID string, restrictUserIDs []string, offset, limit int64) ([]*model.User, int64, error) {
+	return u.db.SearchByPrefix(ctx, keyword, deptID, restrictUserIDs, offset, limit)
+}
+
+func (u *UserStorageManager) ListAll(ctx context.Context, keyword string, offset, limit int64) ([]*model.User, int64, error) {
+	return u.db.ListAll(ctx, keyword, offset, limit)
 }

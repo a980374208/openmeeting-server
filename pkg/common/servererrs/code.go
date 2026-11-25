@@ -31,6 +31,17 @@ const (
 	MeetingCompleteError           = 200004 // meeting update check error
 	MeetingAgentAlreadyOnlineError = 200005 // meeting room already has an online agent
 	MeetingAgentClaimBusyError     = 200006 // concurrent agent claim in progress
+
+	ContactBlockedError               = 300001 // user is blocked by target
+	ContactRequestNotFoundError       = 300002 // contact request not found
+	ContactRequestAlreadyHandledError = 300003 // contact request already handled
+	ContactNotFoundError              = 300004 // contact relation not found
+	DepartmentNotFoundError           = 300005 // organization department not found
+
+	CallBusyError             = 310001 // caller or callee is busy or in meeting
+	CallNotFoundError         = 310002 // call session not found or expired
+	CallAlreadyEndedError     = 310003 // call session already terminated
+	CallPermissionDeniedError = 310004 // caller does not have permission for this call
 )
 
 // General error codes.

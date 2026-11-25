@@ -13,11 +13,17 @@ import (
 
 func NewMeetingMongo(db *mongo.Database) (database.Meeting, error) {
 	coll := db.Collection("meeting")
-	_, err := coll.Indexes().CreateOne(context.Background(), mongo.IndexModel{
-		Keys: bson.D{
-			{Key: "meeting_id", Value: 1},
+	_, err := coll.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "meeting_id", Value: 1}},
+			Options: options.Index().SetUnique(true),
 		},
-		Options: options.Index().SetUnique(true),
+		{
+			Keys: bson.D{{Key: "creator_user_id", Value: 1}, {Key: "status", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "invitee_user_ids", Value: 1}, {Key: "status", Value: 1}, {Key: "scheduled_time", Value: 1}},
+		},
 	})
 	if err != nil {
 		return nil, errs.Wrap(err)
@@ -53,7 +59,17 @@ func (u *MeetingMgo) FindByStatus(ctx context.Context, status []string, userID s
 		"status": bson.M{"$in": status},
 	}
 	if userID != "" {
-		filter["creator_user_id"] = userID
+		filter["$or"] = []bson.M{
+			{"creator_user_id": userID},
+			{"invitee_user_ids": userID},
+		}
 	}
 	return mongoutil.Find[*model.MeetingInfo](ctx, u.coll, filter)
+}
+
+func (u *MeetingMgo) FindByMeetingIDs(ctx context.Context, meetingIDs []string) ([]*model.MeetingInfo, error) {
+	if len(meetingIDs) == 0 {
+		return []*model.MeetingInfo{}, nil
+	}
+	return mongoutil.Find[*model.MeetingInfo](ctx, u.coll, bson.M{"meeting_id": bson.M{"$in": meetingIDs}})
 }

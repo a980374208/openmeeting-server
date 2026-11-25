@@ -41,6 +41,8 @@ type Config struct {
 	API       config.API
 	Discovery config.Discovery
 	Share     config.Share
+	Redis     config.Redis
+	Rtc       config.RTC
 }
 
 func Start(ctx context.Context, index int, config *Config) error {

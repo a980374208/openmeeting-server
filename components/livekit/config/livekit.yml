@@ -18,3 +18,10 @@ room:
   empty_timeout: 72000
   departure_timeout: 86400
 
+# Enable LiveKit webhook to keep Presence InMeeting state synchronized on abrupt disconnects:
+# webhook:
+#   api_key: APIftrpEkL9x2pa
+#   urls:
+#     - http://host.docker.internal:11102/webhook/livekit
+
+

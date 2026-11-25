@@ -26,6 +26,35 @@ func (s *meetingServer) checkUserEnableMicrophone(setting *pbmeeting.MeetingSett
 }
 
 func (s *meetingServer) checkUserInMeeting(ctx context.Context, userID string) (bool, error) {
+	// Fast O(1) path via Redis presence write-through + LiveKit Webhook.
+	if s.eventHub != nil {
+		cachedRoomID, err := s.eventHub.GetUserInMeeting(ctx, userID)
+		if err == nil {
+			if cachedRoomID == "" {
+				return false, nil
+			}
+			// Verify cached room still contains the user; auto-heal stale presence if absent.
+			if s.meetingRtc == nil {
+				return true, nil
+			}
+			userIDs, lErr := s.meetingRtc.GetParticipantUserIDs(ctx, cachedRoomID)
+			if lErr != nil {
+				_ = s.eventHub.ClearUserInMeeting(ctx, userID, cachedRoomID)
+				return false, nil
+			}
+			for _, id := range userIDs {
+				if id == userID {
+					return true, nil
+				}
+			}
+			_ = s.eventHub.ClearUserInMeeting(ctx, userID, cachedRoomID)
+			return false, nil
+		}
+	}
+
+	if s.meetingRtc == nil {
+		return false, nil
+	}
 	rooms, err := s.meetingRtc.GetAllRooms(ctx)
 	if err != nil {
 		return true, err
@@ -36,7 +65,7 @@ func (s *meetingServer) checkUserInMeeting(ctx context.Context, userID string) (
 		if err != nil {
 			return true, errs.WrapMsg(err, "get participants failed")
 		}
-		//check if user is already in meeting
+		// check if user is already in meeting
 		for _, userIdentity := range userIDs {
 			if userIdentity == userID {
 				return true, nil

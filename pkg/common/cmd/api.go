@@ -36,6 +36,8 @@ func NewApiCmd() *ApiCmd {
 		OpenMeetingAPICfgFileName: &apiConfig.API,
 		DiscoveryConfigFilename:   &apiConfig.Discovery,
 		ShareFileName:             &apiConfig.Share,
+		RedisConfigFileName:       &apiConfig.Redis,
+		LiveKitConfigFilename:     &apiConfig.Rtc,
 	}
 	ret.RootCmd = NewRootCmd(program.GetProcessName(), WithConfigMap(ret.configMap))
 	ret.ctx = context.WithValue(context.Background(), "version", config.Version)

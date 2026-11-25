@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cohavora 组织架构管理台</title>
+  <link rel="stylesheet" href="/admin/ui/app.css" />
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Login View -->
+  <div id="loginView" class="login-shell">
+    <div class="login-card">
+      <div class="brand-mark">
+        <div class="brand-logo">C</div>
+        <div>
+          <h1>Cohavora 组织架构管理台</h1>
+          <p class="subtitle">仅限服务端主机指定的架构创始人账号登录</p>
+        </div>
+      </div>
+      <form id="loginForm" class="login-form">
+        <div class="field">
+          <label for="loginAccount">创始人账号</label>
+          <input id="loginAccount" type="text" autocomplete="username" placeholder="请输入服务端指定的创始人账号" required />
+        </div>
+        <div class="field">
+          <label for="loginPassword">登录密码</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入登录密码" required />
+        </div>
+        <div id="loginError" class="alert alert-error hidden"></div>
+        <button id="loginSubmitBtn" type="submit" class="btn btn-primary btn-block">登录管理台</button>
+      </form>
+      <div class="login-footnote">
+        架构创始人仅能通过服务端主机配置 <code>orgFounders</code>（或环境变量 <code>OPENMEETING_ORG_FOUNDERS</code>）指定，普通用户无法通过网络提权。
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Console View -->
+  <div id="appView" class="app-shell hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-logo sm">C</div>
+        <span class="topbar-title">Cohavora 组织架构管理台</span>
+        <span id="versionBadge" class="badge badge-neutral">版本: —</span>
+      </div>
+      <div class="topbar-right">
+        <button id="btnReload" class="btn btn-ghost btn-sm" title="重新从服务端加载">刷新</button>
+        <button id="btnImport" class="btn btn-ghost btn-sm">批量导入</button>
+        <div class="founder-pill">
+          <span class="dot-online"></span>
+          <span id="founderLabel">创始人</span>
+        </div>
+        <button id="btnLogout" class="btn btn-ghost btn-sm">退出登录</button>
+      </div>
+    </header>
+
+    <!-- Pending changes bar -->
+    <div id="dirtyBar" class="dirty-bar hidden">
+      <div class="dirty-info">
+        <span class="dirty-dot"></span>
+        <strong id="dirtySummaryText">存在未应用的组织架构修改</strong>
+        <span class="dirty-hint">点击右侧“确认应用并通知客户端”后才会生效并实时推送给所有在线客户端。</span>
+      </div>
+      <div class="dirty-actions">
+        <button id="btnDiscard" class="btn btn-secondary btn-sm">放弃修改</button>
+        <button id="btnApply" class="btn btn-primary btn-sm">确认应用并通知客户端</button>
+      </div>
+    </div>
+
+    <div class="workspace">
+      <!-- Left Sidebar: Department Tree -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-search">
+            <input id="deptSearchInput" type="search" placeholder="筛选部门..." />
+          </div>
+          <button id="btnAddRootDept" class="btn btn-primary btn-sm">+ 新建顶级部门</button>
+        </div>
+
+        <div class="nav-special">
+          <button id="btnViewAllUsers" class="special-item">
+            <span>全部注册用户</span>
+            <span id="allUsersCountBadge" class="count-pill">0</span>
+          </button>
+          <button id="btnViewHistory" class="special-item" style="margin-top:6px;">
+            <span>工号与变动记录</span>
+            <span id="historyCountBadge" class="count-pill">0</span>
+          </button>
+        </div>
+
+        <div class="vis-policy-card">
+          <div class="vis-policy-head">
+            <span class="vis-policy-title">成员查看权限（默认）</span>
+          </div>
+          <div class="segmented segmented-full" id="orgVisibilityGroup">
+            <button type="button" class="seg-btn active" data-vis="all">全部成员</button>
+            <button type="button" class="seg-btn" data-vis="own_dept">仅本部门</button>
+          </div>
+          <div class="vis-policy-hint">组织架构树全员可见；单部门可单独覆写此权限。</div>
+        </div>
+
+        <div class="tree-section-title">
+          <span>企业组织架构树</span>
+          <span id="deptCountBadge" class="count-pill">0</span>
+        </div>
+
+        <div id="deptTreeContainer" class="dept-tree"></div>
+        <div id="deptTreeEmpty" class="empty-hint hidden">
+          暂未创建任何部门。点击上方「+ 新建顶级部门」开始搭建组织架构；未加入部门的普通用户客户端将不会显示组织架构页签。
+        </div>
+      </aside>
+
+      <!-- Main Right Content -->
+      <main class="main-panel">
+        <!-- Department Detail Panel -->
+        <section id="deptPanel" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <div id="deptBreadcrumb" class="breadcrumb">组织架构</div>
+              <h2 id="deptTitle" class="panel-title">部门名称</h2>
+              <div id="deptMeta" class="panel-meta"></div>
+            </div>
+            <div class="panel-actions">
+              <label class="inline-vis-wrap" title="单独配置该部门成员可查看哪些部门的成员（组织架构树始终可见）">
+                <span>查看权限</span>
+                <select id="deptVisibilitySelect" class="inline-vis-select">
+                  <option value="">继承组织默认</option>
+                  <option value="all">可查看全部成员</option>
+                  <option value="own_dept">仅可查看本部门成员</option>
+                </select>
+              </label>
+              <button id="btnAddSubDept" class="btn btn-secondary btn-sm">+ 子部门</button>
+              <button id="btnEditDept" class="btn btn-secondary btn-sm">编辑部门</button>
+              <button id="btnDeleteDept" class="btn btn-danger-ghost btn-sm">删除部门</button>
+              <button id="btnAddMembers" class="btn btn-primary btn-sm">+ 添加成员</button>
+            </div>
+          </div>
+
+          <div class="table-toolbar">
+            <input id="deptMemberSearch" type="search" placeholder="在当前部门成员中筛选姓名、账号、工号或职位..." />
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>成员</th>
+                  <th>账号</th>
+                  <th>工号</th>
+                  <th>职位</th>
+                  <th>角色</th>
+                  <th class="col-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody id="deptMembersBody"></tbody>
+            </table>
+            <div id="deptMembersEmpty" class="empty-panel hidden">
+              该部门暂无成员，点击右上角「+ 添加成员」将系统用户加入本部门。
+            </div>
+          </div>
+        </section>
+
+        <!-- All Users Panel -->
+        <section id="allUsersPanel" class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="breadcrumb">用户目录与组织归属</div>
+              <h2 class="panel-title">全部注册用户</h2>
+              <div id="allUsersMeta" class="panel-meta"></div>
+            </div>
+            <div class="panel-actions">
+              <div class="segmented" id="userFilterGroup">
+                <button class="seg-btn active" data-filter="all">全部</button>
+                <button class="seg-btn" data-filter="in_org">组织成员</button>
+                <button class="seg-btn" data-filter="external">外部用户</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-toolbar">
+            <input id="allUsersSearch" type="search" placeholder="按姓名、账号、工号、职位或部门搜索用户..." />
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>用户</th>
+                  <th>账号</th>
+                  <th>工号 / 职位</th>
+                  <th>组织架构归属</th>
+                  <th class="col-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody id="allUsersBody"></tbody>
+            </table>
+            <div id="allUsersEmpty" class="empty-panel hidden">未找到匹配的用户。</div>
+          </div>
+        </section>
+
+        <!-- Employee Number & Removal History Panel -->
+        <section id="historyPanel" class="panel hidden">
+          <div class="panel-header">
+            <div>
+              <div class="breadcrumb">工号归档与组织变动</div>
+              <h2 class="panel-title">工号与变动记录</h2>
+              <div id="historyMeta" class="panel-meta"></div>
+            </div>
+            <div class="panel-actions">
+              <div class="segmented" id="historyFilterGroup">
+                <button class="seg-btn active" data-filter="all">全部</button>
+                <button class="seg-btn" data-filter="active">在职</button>
+                <button class="seg-btn" data-filter="removed">已移出</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-toolbar">
+            <input id="historySearch" type="search" placeholder="按工号、姓名、账号、职位、部门或移出原因搜索..." />
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>工号</th>
+                  <th>用户</th>
+                  <th>状态</th>
+                  <th>部门 / 职位</th>
+                  <th>加入与移出时间</th>
+                  <th>移出原因</th>
+                </tr>
+              </thead>
+              <tbody id="historyBody"></tbody>
+            </table>
+            <div id="historyEmpty" class="empty-panel hidden">暂无工号分配或移出记录。</div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Backdrop -->
+  <div id="modalBackdrop" class="modal-backdrop hidden">
+    <div id="modalDialog" class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle">标题</h3>
+        <button id="modalCloseBtn" class="icon-btn" aria-label="关闭">&times;</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+      <div id="modalFooter" class="modal-footer"></div>
+    </div>
+  </div>
+
+  <script src="/admin/ui/app.js"></script>
+</body>
+</html>

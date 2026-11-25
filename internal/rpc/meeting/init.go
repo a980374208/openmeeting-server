@@ -4,10 +4,13 @@ import (
 	"context"
 	"sync"
 	"github.com/openimsdk/openmeeting-server/pkg/agentrpc"
+	"github.com/openimsdk/openmeeting-server/pkg/callrpc"
 	"github.com/openimsdk/openmeeting-server/pkg/common/config"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/cache/redis"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/controller"
 	"github.com/openimsdk/openmeeting-server/pkg/common/storage/database/mgo"
+	"github.com/openimsdk/openmeeting-server/pkg/contactrpc"
+	"github.com/openimsdk/openmeeting-server/pkg/events"
 	"github.com/openimsdk/openmeeting-server/pkg/rpcclient"
 	"github.com/openimsdk/openmeeting-server/pkg/rtc"
 	"github.com/openimsdk/openmeeting-server/pkg/rtc/livekit"
@@ -26,7 +29,9 @@ type meetingServer struct {
 	meetingRtc            rtc.MeetingRtc
 	config                *Config
 	userRpc               *rpcclient.User
+	contactRpc            contactrpc.ContactDirectoryServiceClient
 	rdb                   goredis.UniversalClient
+	eventHub              *events.Hub
 	agentLockMu           sync.Mutex
 	agentRoomLocks        map[string]*sync.Mutex
 	agentPendingClaims    map[string]pendingAgentClaim
@@ -60,6 +65,7 @@ func Start(ctx context.Context, config *Config, client registry.SvcDiscoveryRegi
 	meetingRtc := livekit.NewLiveKit(&config.Rtc)
 
 	user := userfind.NewMeeting(client, config.Share.RpcRegisterName.User)
+	contactClient := userfind.NewContactDirectoryClient(client, config.Share.RpcRegisterName.User)
 
 	// init rpc client here
 	userRpc := rpcclient.NewUser(user)
@@ -70,11 +76,14 @@ func Start(ctx context.Context, config *Config, client registry.SvcDiscoveryRegi
 		config:                config,
 		meetingRtc:            meetingRtc,
 		userRpc:               userRpc,
+		contactRpc:            contactClient,
 		rdb:                   rdb,
+		eventHub:              events.NewHub(rdb),
 		agentRoomLocks:        make(map[string]*sync.Mutex),
 		agentPendingClaims:    make(map[string]pendingAgentClaim),
 	}
 	pbmeeting.RegisterMeetingServiceServer(server, u)
 	agentrpc.RegisterAgentTokenServiceServer(server, u)
+	callrpc.RegisterCallSignalingServiceServer(server, u)
 	return nil
 }

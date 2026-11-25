@@ -19,11 +19,12 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-require github.com/google/uuid v1.6.0 // indirect
+require github.com/google/uuid v1.6.0
 
 require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/protobuf v1.5.4
+	github.com/gorilla/websocket v1.5.1
 	github.com/livekit/protocol v1.9.7
 	github.com/livekit/server-sdk-go v1.1.8
 	github.com/openimsdk/gomake v0.0.14-alpha.5
@@ -57,7 +58,8 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/gorilla/websocket v1.5.1 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect

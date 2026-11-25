@@ -20,6 +20,7 @@ type Meeting interface {
 	Update(ctx context.Context, meetingID string, updateData map[string]any) (err error)
 	Delete(ctx context.Context, meetingID string) (err error)
 	FindByStatus(ctx context.Context, status []string, userID string) ([]*model.MeetingInfo, error)
+	FindByMeetingIDs(ctx context.Context, meetingIDs []string) ([]*model.MeetingInfo, error)
 	TakeCatalog(ctx context.Context, meetingID string) (*model.MeetingInfo, error)
 	GenerateMeetingID(ctx context.Context) (string, error)
 }
@@ -75,6 +76,10 @@ func (u *MeetingStorageManager) Delete(ctx context.Context, meetingID string) (e
 
 func (u *MeetingStorageManager) FindByStatus(ctx context.Context, status []string, userID string) ([]*model.MeetingInfo, error) {
 	return u.db.FindByStatus(ctx, status, userID)
+}
+
+func (u *MeetingStorageManager) FindByMeetingIDs(ctx context.Context, meetingIDs []string) ([]*model.MeetingInfo, error) {
+	return u.db.FindByMeetingIDs(ctx, meetingIDs)
 }
 
 func (u *MeetingStorageManager) GenerateMeetingID(ctx context.Context) (string, error) {

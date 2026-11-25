@@ -53,7 +53,10 @@ func Start(ctx context.Context, index int, config *Config) error {
 		netErr  error
 	)
 
-	router := newAdminGinRouter(ctx, client, config)
+	router, err := newAdminGinRouter(ctx, client, config)
+	if err != nil {
+		return err
+	}
 	if config.AdminAPI.Prometheus.Enable {
 		go func() {
 			p := ginprom.NewPrometheus("app", prommetrics.GetGinCusMetrics("AdminApi"))

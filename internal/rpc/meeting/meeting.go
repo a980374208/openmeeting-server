@@ -75,6 +75,9 @@ func (s *meetingServer) CreateImmediateMeeting(ctx context.Context, req *pbmeeti
 	if err := s.meetingRtc.UpdateMetaData(ctx, metaData); err != nil {
 		return resp, err
 	}
+	if s.eventHub != nil {
+		_ = s.eventHub.SetUserInMeeting(ctx, req.CreatorUserID, meetingDBInfo.MeetingID)
+	}
 
 	resp.Detail = metaData.Detail
 	resp.LiveKit = &pbmeeting.LiveKit{
@@ -133,6 +136,9 @@ func (s *meetingServer) JoinMeeting(ctx context.Context, req *pbmeeting.JoinMeet
 			return resp, err
 		}
 
+		if s.eventHub != nil {
+			_ = s.eventHub.SetUserInMeeting(ctx, req.UserID, dbInfo.MeetingID)
+		}
 		resp.LiveKit = &pbmeeting.LiveKit{
 			Token: token,
 			Url:   liveUrl,
@@ -155,7 +161,10 @@ func (s *meetingServer) JoinMeeting(ctx context.Context, req *pbmeeting.JoinMeet
 
 	if req.UserID != s.getHostUserID(metaData) && req.UserID != s.getCreatorUserID(metaData) &&
 		req.Password != metaData.Detail.Info.CreatorDefinedMeeting.Password {
-		return resp, servererrs.ErrMeetingPasswordNotMatch.WrapMsg("meeting password not match, please check and try again!")
+		locked := metaData.Detail != nil && metaData.Detail.Setting != nil && metaData.Detail.Setting.LockMeeting
+		if !s.hasInviteAdmission(ctx, dbInfo, req.UserID, locked) {
+			return resp, servererrs.ErrMeetingPasswordNotMatch.WrapMsg("meeting password not match, please check and try again!")
+		}
 	}
 
 	metaData.Detail.Info.SystemGenerated.MeetingID = req.MeetingID
@@ -179,6 +188,9 @@ func (s *meetingServer) JoinMeeting(ctx context.Context, req *pbmeeting.JoinMeet
 	}
 	if err := s.meetingRtc.UpdateMetaData(ctx, metaData); err != nil {
 		return resp, errs.WrapMsg(err, "update meta data failed")
+	}
+	if s.eventHub != nil {
+		_ = s.eventHub.SetUserInMeeting(ctx, req.UserID, req.MeetingID)
 	}
 	resp.LiveKit = &pbmeeting.LiveKit{
 		Token: token,
@@ -215,6 +227,9 @@ func (s *meetingServer) LeaveMeeting(ctx context.Context, req *pbmeeting.LeaveMe
 	if err := s.meetingRtc.RemoveParticipant(ctx, req.MeetingID, req.UserID); err != nil {
 		return resp, err
 	}
+	if s.eventHub != nil {
+		_ = s.eventHub.ClearUserInMeeting(ctx, req.UserID, req.MeetingID)
+	}
 
 	return resp, nil
 }
@@ -246,8 +261,15 @@ func (s *meetingServer) EndMeeting(ctx context.Context, req *pbmeeting.EndMeetin
 	updateData := map[string]any{
 		"status": status,
 	}
+	participantIDs, _ := s.meetingRtc.GetParticipantUserIDs(ctx, req.MeetingID)
 	if err := s.meetingRtc.CloseRoom(ctx, req.MeetingID); err != nil {
 		return resp, err
+	}
+	if s.eventHub != nil {
+		for _, uid := range participantIDs {
+			_ = s.eventHub.ClearUserInMeeting(ctx, uid, req.MeetingID)
+		}
+		_ = s.eventHub.ClearUserInMeeting(ctx, req.UserID, req.MeetingID)
 	}
 	if req.EndType == pbmeeting.MeetingEndType_EndType {
 		if err := s.meetingStorageHandler.Update(ctx, req.MeetingID, updateData); err != nil {
@@ -289,6 +311,17 @@ func (s *meetingServer) GetMeetings(ctx context.Context, req *pbmeeting.GetMeeti
 			return resp, err
 		}
 		meetingDetails = append(meetingDetails, ongoing...)
+		// Also include ongoing meetings where req.UserID is an invitee.
+		if invitedOngoing, iErr := s.meetingStorageHandler.FindByStatus(ctx, []string{constant.InProgress}, req.UserID); iErr == nil {
+			for _, meeting := range invitedOngoing {
+				if meeting.CreatorUserID == req.UserID {
+					continue
+				}
+				if detailSetting, dErr := s.getMeetingDetailSetting(ctx, meeting); dErr == nil {
+					meetingDetails = append(meetingDetails, detailSetting)
+				}
+			}
+		}
 	}
 	if len(creatorStatuses) > 0 {
 		meetings, err := s.meetingStorageHandler.FindByStatus(ctx, creatorStatuses, req.UserID)
@@ -586,6 +619,9 @@ func (s *meetingServer) CleanPreviousMeetings(ctx context.Context, req *pbmeetin
 			if err := s.meetingRtc.RemoveParticipant(ctx, room.Name, req.UserID); err != nil {
 				log.ZError(ctx, "remove participant error", err, "login and clean previous rooms", room.Name, req.UserID)
 				continue
+			}
+			if s.eventHub != nil {
+				_ = s.eventHub.ClearUserInMeeting(ctx, req.UserID, room.Name)
 			}
 		}
 	}
